@@ -12,6 +12,92 @@ from swingmusic.plugins import Plugin, plugin_method
 from swingmusic.settings import Paths
 
 
+class LRCLIBProvider:
+    """
+    LRCLIB provider class - Free, open lyrics library with no API key required.
+    https://lrclib.net
+    """
+
+    BASE_URL = "https://lrclib.net/api"
+
+    def __init__(self) -> None:
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "user-agent": "SwingMusic/1.0 (https://github.com/swingmusic)",
+                "Accept": "application/json",
+            }
+        )
+
+    def get_lyrics(
+        self, title: str, artist: str, album: str = "", duration: int = 0
+    ) -> Optional[dict]:
+        """
+        Fetch lyrics from LRCLIB by track signature.
+
+        Returns a dict with 'plainLyrics' and/or 'syncedLyrics' keys, or None.
+        """
+        params = {
+            "track_name": title,
+            "artist_name": artist,
+        }
+        if album:
+            params["album_name"] = album
+        if duration > 0:
+            params["duration"] = duration
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/get", params=params, timeout=10
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get("syncedLyrics") or data.get("plainLyrics"):
+                    return data
+            elif response.status_code == 429:
+                # Rate limited - wait and retry once
+                retry_after = int(response.headers.get("Retry-After", 2))
+                time.sleep(min(retry_after, 5))
+                response = self.session.get(
+                    f"{self.BASE_URL}/get", params=params, timeout=10
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("syncedLyrics") or data.get("plainLyrics"):
+                        return data
+        except (requests.RequestException, ValueError):
+            pass
+
+        return None
+
+    def search(self, query: str, limit: int = 5) -> list:
+        """
+        Search for lyrics records.
+
+        Returns a list of matching tracks with lyrics data.
+        """
+        params = {"q": query, "limit": limit}
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/search", params=params, timeout=10
+            )
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                retry_after = int(response.headers.get("Retry-After", 2))
+                time.sleep(min(retry_after, 5))
+                response = self.session.get(
+                    f"{self.BASE_URL}/search", params=params, timeout=10
+                )
+                if response.status_code == 200:
+                    return response.json()
+        except (requests.RequestException, ValueError):
+            pass
+
+        return []
+
+
 class LRCProvider:
     """
     Base class for all of the synced (LRC format) lyrics providers.

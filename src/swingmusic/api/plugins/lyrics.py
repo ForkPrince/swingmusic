@@ -5,12 +5,12 @@ from swingmusic.api.apischemas import TrackHashSchema
 from swingmusic.config import UserConfig
 from swingmusic.lib.lyrics import Lyrics as Lyrics_class
 
-from swingmusic.plugins.lyrics import Lyrics
+from swingmusic.plugins.lyrics import Lyrics, LRCLIBProvider
 from swingmusic.premium import CloudError, LicenseError
 from swingmusic.settings import Defaults
 from swingmusic.utils.hashing import create_hash
 
-bp_tag = Tag(name="Lyrics Plugin", description="Musixmatch lyrics plugin")
+bp_tag = Tag(name="Lyrics Plugin", description="Lyrics plugin (LRCLIB + Musixmatch)")
 api = APIBlueprint(
     "lyricsplugin", __name__, url_prefix="/plugins/lyrics", abp_tags=[bp_tag]
 )
@@ -34,6 +34,8 @@ class LyricsSearchBody(TrackHashSchema):
 def search_lyrics(body: LyricsSearchBody):
     """
     Search for lyrics by title and artist
+
+    Tries LRCLIB first (free, no API key), then falls back to Musixmatch.
     """
     title = body.title
     artist = body.artist
@@ -41,6 +43,29 @@ def search_lyrics(body: LyricsSearchBody):
     filepath = body.filepath
     trackhash = body.trackhash
 
+    # 1. Try LRCLIB first (free, best synced lyrics coverage)
+    lrclib = LRCLIBProvider()
+    lrclib_result = lrclib.get_lyrics(title, artist, album)
+
+    if lrclib_result:
+        synced = lrclib_result.get("syncedLyrics")
+        plain = lrclib_result.get("plainLyrics")
+
+        if synced:
+            lyrics = Lyrics_class(synced)
+            return {
+                "trackhash": trackhash,
+                "lyrics": lyrics.format_synced_lyrics(),
+                "source": "lrclib",
+            }, 200
+        elif plain:
+            return {
+                "trackhash": trackhash,
+                "lyrics": plain,
+                "source": "lrclib",
+            }, 200
+
+    # 2. Try premium cloud lyrics (if available)
     try:
         from swingmusic.store.tracks import TrackStore
         from swingmusic.premium.plugins.lyrics import CloudLyricsPlugin
@@ -65,7 +90,11 @@ def search_lyrics(body: LyricsSearchBody):
     except LicenseError as e:
         print("Error getting lyrics from cloud server: ", e)
         pass
+    except ModuleNotFoundError:
+        # Premium module not available in this build
+        pass
 
+    # 3. Fallback to Musixmatch
     finder = Lyrics()
     data = finder.search_lyrics_by_title_and_artist(title, artist)
 
