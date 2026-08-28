@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 import requests
 from typing import Any
@@ -11,7 +12,9 @@ from swingmusic.settings import Paths
 from swingmusic.utils.threading import background
 from swingmusic.plugins import Plugin, plugin_method
 
-from swingmusic.logger import log
+from swingmusic.logger import log as _log
+
+log = _log or logging.getLogger(__name__)
 
 
 class LastFmPlugin(Plugin):

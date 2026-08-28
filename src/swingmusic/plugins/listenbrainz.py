@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import time
 import uuid
@@ -12,7 +13,9 @@ from swingmusic.settings import Paths
 from swingmusic.utils.threading import background
 from swingmusic.plugins import Plugin, plugin_method
 
-from swingmusic.logger import log
+from swingmusic.logger import log as _log
+
+log = _log or logging.getLogger(__name__)
 
 from importlib.metadata import version as _pkg_version
 
