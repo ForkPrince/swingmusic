@@ -14,6 +14,7 @@ from swingmusic.models.album import Album
 from swingmusic.models.stats import StatItem
 from swingmusic.models.track import Track
 from swingmusic.plugins.lastfm import LastFmPlugin
+from swingmusic.plugins.listenbrainz import ListenBrainzPlugin
 from swingmusic.serializers.artist import serialize_for_card
 from swingmusic.serializers.album import serialize_for_card as serialize_for_album_card
 from swingmusic.serializers.track import serialize_track, serialize_tracks
@@ -113,7 +114,33 @@ def log_track(body: LogTrackBody):
     ):
         lastfm.scrobble(trackentry.tracks[0], timestamp)
 
+    lb = ListenBrainzPlugin(current_userid=get_current_userid())
+
+    if (
+        lb.enabled
+        and track.duration > 30
+        and body.duration >= min(track.duration / 2, 240)
+    ):
+        lb.scrobble(trackentry.tracks[0], timestamp)
+
     return {"msg": "recorded"}, 201
+
+
+@api.post("/track/playing")
+def log_playing_now(body: TrackHashSchema):
+    """
+    Submit a playing_now notification to ListenBrainz.
+    No scrobble is recorded; only notifies ListenBrainz.
+    """
+    trackentry = TrackStore.trackhashmap.get(body.trackhash)
+    if trackentry is None:
+        return {"msg": "Track not found."}, 404
+
+    lb = ListenBrainzPlugin(current_userid=get_current_userid())
+    if lb.enabled:
+        lb.submit_playing_now(trackentry.tracks[0])
+
+    return {"msg": "playing_now sent"}, 200
 
 
 class ChartItemsQuery(BaseModel):

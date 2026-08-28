@@ -110,6 +110,8 @@ def get_all_settings():
     current_user = get_current_userid()
     config["lastfmSessionKey"] = config["lastfmSessionKeys"].get(str(current_user), "")
     del config["lastfmSessionKeys"]
+    config["listenbrainzToken"] = config["listenbrainzTokens"].get(str(current_user), "")
+    del config["listenbrainzTokens"]
 
     # remove license info if user is not admin
     # if "admin" not in UserTable.get_by_id(current_user).roles:
@@ -118,7 +120,13 @@ def get_all_settings():
     # add device name to config
     config["deviceName"] = get_device_name()
     config["deviceId"] = get_device_id()
-    config["licenseInfo"] = LicenseManager().get_license_info()
+    if LicenseManager is not None:
+        try:
+            config["licenseInfo"] = LicenseManager().get_license_info()
+        except Exception:
+            config["licenseInfo"] = None
+    else:
+        config["licenseInfo"] = None
 
     return config
 

@@ -85,6 +85,7 @@ exclude = ["*.tests", "*.tests.*"]
 "*" = ["*/tests/*", "tests/*"]
 
 [tool.setuptools.package-data]
+"swingmusic" = ["client.zip"]
 "swingmusic.premium" = ["*.so", "*.pyd"]
 "swingmusic.premium.recipes" = ["*.so", "*.pyd"]
 "swingmusic.premium.classical" = ["*.so", "*.pyd"]

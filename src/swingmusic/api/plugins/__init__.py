@@ -5,6 +5,7 @@ from swingmusic.api.auth import admin_required
 from swingmusic.config import UserConfig
 from swingmusic.db.userdata import PluginTable
 from swingmusic.plugins.lastfm import LastFmPlugin
+from swingmusic.plugins.listenbrainz import ListenBrainzPlugin
 from swingmusic.utils.auth import get_current_userid
 
 bp_tag = Tag(name="Plugins", description="Manage plugins")
@@ -101,3 +102,68 @@ def delete_lastfm_session():
     config.lastfmSessionKeys = config.lastfmSessionKeys
 
     return {"status": "success"}
+
+
+class ListenBrainzTokenBody(BaseModel):
+    token: str = Field(description="ListenBrainz user token")
+    base_url: str | None = Field(
+        default=None, description="Custom ListenBrainz API base URL"
+    )
+
+
+@api.post("/listenbrainz/token")
+def set_listenbrainz_token(body: ListenBrainzTokenBody):
+    """
+    Save ListenBrainz token for current user
+    """
+    if not body.token:
+        return {"error": "Missing token"}, 400
+
+    base_url = body.base_url.strip().rstrip("/") if body.base_url else None
+
+    config = UserConfig()
+    current_user = get_current_userid()
+
+    if base_url:
+        config.listenbrainzBaseUrl = base_url
+
+    plugin = ListenBrainzPlugin(current_userid=current_user)
+    if not plugin.validate_token(body.token, base_url):
+        return {"error": "Invalid token"}, 401
+
+    config.listenbrainzTokens[str(current_user)] = body.token
+    config.listenbrainzTokens = config.listenbrainzTokens
+
+    return {"status": "success"}
+
+
+@api.delete("/listenbrainz/token")
+def delete_listenbrainz_token():
+    """
+    Delete ListenBrainz token for current user
+    """
+    config = UserConfig()
+    current_user = get_current_userid()
+    try:
+        config.listenbrainzTokens.pop(str(current_user))
+    except KeyError:
+        pass
+    config.listenbrainzTokens = config.listenbrainzTokens
+
+    return {"status": "success"}
+
+
+@api.get("/listenbrainz/status")
+def listenbrainz_status():
+    """
+    Check ListenBrainz connectivity for current user
+    """
+    config = UserConfig()
+    current_user = get_current_userid()
+    token = config.listenbrainzTokens.get(str(current_user), "")
+    if not token:
+        return {"connected": False}
+
+    plugin = ListenBrainzPlugin(current_userid=current_user)
+    valid = plugin.validate_token(token)
+    return {"connected": valid, "base_url": config.listenbrainzBaseUrl}

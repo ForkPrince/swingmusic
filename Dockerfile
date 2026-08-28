@@ -147,4 +147,22 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-deps /tmp/wheels/*.whl && \
     rm -rf /tmp/wheels
 
+# Bake custom client.zip if provided at build time (webclient workflow).
+# Dummy file ensures COPY succeeds when no custom UI is baked; workflow overwrites it.
+COPY src/swingmusic/client.zip* /tmp/
+RUN if [ -f /tmp/client.zip ]; then \
+      SITE=$(python -c "import site; print(site.getsitepackages()[0])") && \
+      mkdir -p $SITE/swingmusic && \
+      # skip dummy empty file (size < 100 bytes)
+      if [ $(stat -c%s /tmp/client.zip 2>/dev/null || stat -f%z /tmp/client.zip) -gt 100 ]; then \
+        cp /tmp/client.zip $SITE/swingmusic/client.zip && \
+        echo "Custom client.zip baked into $SITE/swingmusic/client.zip" && \
+        ls -lh $SITE/swingmusic/client.zip; \
+      else \
+        echo "No custom client.zip - using default/downloaded client"; \
+      fi; \
+    else \
+      echo "No custom client.zip - using default/downloaded client"; \
+    fi && rm -f /tmp/client.zip /tmp/client.zip*
+
 ENTRYPOINT ["python", "-m", "swingmusic", "--host", "0.0.0.0", "--config", "/config"]

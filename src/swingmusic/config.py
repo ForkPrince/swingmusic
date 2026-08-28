@@ -87,6 +87,8 @@ class UserConfig(metaclass=Singleton):
     lastfmApiKey: str = "0553005e93f9a4b4819d835182181806"
     lastfmApiSecret: str = "5e5306fbf3e8e3bc92f039b6c6c4bd4e"
     lastfmSessionKeys: dict[str, str] = field(default_factory=dict)
+    listenbrainzTokens: dict[str, str] = field(default_factory=dict)
+    listenbrainzBaseUrl: str = "https://api.listenbrainz.org"
     artistArticleAwareSorting: bool = False
     trustCloudLyrics: bool = False
 
