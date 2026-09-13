@@ -269,6 +269,25 @@ def build() -> OpenAPI:
         verify_jwt_in_request()
 
     @app.after_request
+    def set_cache_headers(response: Response):
+        path = request.path
+
+        # index.html, sw.js, manifest: always revalidate
+        if path in ("/", "/index.html", "/sw.js", "/manifest.webmanifest"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return response
+
+        # Fingerprinted assets (Vite hashes filenames): cache forever
+        if any(
+            path.endswith(ext)
+            for ext in (".js", ".css", ".woff2", ".woff", ".ttf")
+        ):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            return response
+
+        return response
+
+    @app.after_request
     def refresh_expiring_jwt(response: Response):
         """
         Refreshes the cookies JWT token after each request.
